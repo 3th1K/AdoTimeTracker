@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AdoTimeTracker.Core/AdoTimeTracker.Core.csproj" />
+  <Project Path="AdoTimeTracker.Tray/AdoTimeTracker.Tray.csproj" />
+</Solution>
