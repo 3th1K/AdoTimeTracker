@@ -1,0 +1,67 @@
+name: Deploy AdoTimeTracker.Core
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+    - 'AdoTimeTracker.Core/**'
+  pull_request:
+    branches: [ "master" ]
+    paths:
+    - 'AdoTimeTracker.Core/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        project:
+          - 'AdoTimeTracker.Core/AdoTimeTracker.Core.csproj'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+        
+    - name: Restore dependencies
+      run: dotnet restore ${{ matrix.project }}
+      
+    - name: Build
+      run: dotnet build ${{ matrix.project }}
+  
+
+  pack-and-publish:
+    runs-on: windows-latest
+    needs: [build]
+
+    strategy:
+      matrix:
+        project:
+          - 'AdoTimeTracker.Core/AdoTimeTracker.Core.csproj'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ matrix.project }}
+
+    - name: Build
+      run: dotnet build ${{ matrix.project }} --configuration Release --no-restore
+
+    - name: Pack the project
+      run: dotnet pack ${{ matrix.project }} --configuration Release --no-build --output ./nupkg
+
+    - name: Publish NuGet package
+      run: dotnet nuget push "./nupkg/*.nupkg" --source "https://api.nuget.org/v3/index.json"
+      continue-on-error: true
