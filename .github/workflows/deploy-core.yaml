@@ -11,8 +11,11 @@ on:
     - 'AdoTimeTracker.Core/**'
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: windows-latest
+    permissions:
+      id-token: write # CRITICAL: Allows GitHub to issue the OIDC cryptographic token
+      contents: read  # Allows the action to checkout your repository code
 
     strategy:
       matrix:
@@ -32,36 +35,21 @@ jobs:
       run: dotnet restore ${{ matrix.project }}
       
     - name: Build
-      run: dotnet build ${{ matrix.project }}
-  
-
-  pack-and-publish:
-    runs-on: windows-latest
-    needs: [build]
-
-    strategy:
-      matrix:
-        project:
-          - 'AdoTimeTracker.Core/AdoTimeTracker.Core.csproj'
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 10.0.x
-
-    - name: Restore dependencies
-      run: dotnet restore ${{ matrix.project }}
-
-    - name: Build
       run: dotnet build ${{ matrix.project }} --configuration Release --no-restore
 
+    # Only execute package generation and deployment on master merge events
     - name: Pack the project
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       run: dotnet pack ${{ matrix.project }} --configuration Release --no-build --output ./nupkg
 
+    # Exchanges the short-lived GitHub token for a temporary 1-hour NuGet API Key
+    - name: NuGet Login (OIDC)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      id: nuget-login
+      uses: NuGet/login@v1
+
+    # Pushes package seamlessly without manually supplying any API key secrets
     - name: Publish NuGet package
-      run: dotnet nuget push "./nupkg/*.nupkg" --source "https://api.nuget.org/v3/index.json"
-      continue-on-error: true
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      run: |
+        dotnet nuget push "./nupkg/*.nupkg" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
