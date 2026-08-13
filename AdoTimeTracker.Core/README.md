@@ -1,1 +1,1 @@
-this is the core package for the AdoTimeTracker application. It contains the essential components and logic required for time tracking functionality
+This is the core package for the AdoTimeTracker application. It contains the essential components and logic required for time tracking functionality.
