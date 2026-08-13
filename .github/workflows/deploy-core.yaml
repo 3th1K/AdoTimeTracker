@@ -48,7 +48,7 @@ jobs:
         id: nuget-login
         uses: NuGet/login@v1
         with:
-          user: mehedi
+          user: Mehedi
           #user: ${{ secrets.NUGET_USER }}
 
       - name: Publish NuGet package
