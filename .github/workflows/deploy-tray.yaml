@@ -1,0 +1,116 @@
+name: Deploy AdoTimeTracker.Tray
+
+on:
+  push:
+    branches: ["master"]
+    paths:
+      - "AdoTimeTracker.Tray/**"
+
+  pull_request:
+    branches: ["master"]
+    paths:
+      - "AdoTimeTracker.Tray/**"
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      # ------------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------
+      # Setup .NET
+      # ------------------------------------------------------------
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # ------------------------------------------------------------
+      # Restore
+      # ------------------------------------------------------------
+      - name: Restore dependencies
+        run: |
+          dotnet restore "AdoTimeTracker.Tray/AdoTimeTracker.Tray.csproj"
+
+      # ------------------------------------------------------------
+      # Build
+      # ------------------------------------------------------------
+      - name: Build
+        run: |
+          dotnet build "AdoTimeTracker.Tray/AdoTimeTracker.Tray.csproj" `
+            --configuration Release `
+            --no-restore
+
+      # ------------------------------------------------------------
+      # Publish
+      # ------------------------------------------------------------
+      - name: Publish Tray App
+        run: |
+          dotnet publish "AdoTimeTracker.Tray/AdoTimeTracker.Tray.csproj" `
+            --configuration Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            --output "./publish"
+
+      # ------------------------------------------------------------
+      # Copy configuration files
+      # ------------------------------------------------------------
+      - name: Copy configuration files
+        shell: pwsh
+        run: |
+          Copy-Item `
+            -Path "AdoTimeTracker.Tray/appsettings.json" `
+            -Destination "./publish/appsettings.json" `
+            -Force
+
+          if (Test-Path "AdoTimeTracker.Tray/leaves.json") {
+            Copy-Item `
+              -Path "AdoTimeTracker.Tray/leaves.json" `
+              -Destination "./publish/leaves.json" `
+              -Force
+          }
+
+      # ------------------------------------------------------------
+      # Create ZIP
+      # ------------------------------------------------------------
+      - name: Create ZIP package
+        shell: pwsh
+        run: |
+          $publishDir = "./publish"
+          $zipFile = "./AdoTimeTracker.Tray.zip"
+
+          if (Test-Path $zipFile) {
+            Remove-Item $zipFile -Force
+          }
+
+          Compress-Archive `
+            -Path "$publishDir/*" `
+            -DestinationPath $zipFile
+
+          Write-Host "Created package:"
+          Get-Item $zipFile
+
+      # ------------------------------------------------------------
+      # Create GitHub Release
+      # ------------------------------------------------------------
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "v${{ github.run_number }}"
+          $releaseName = "AdoTimeTracker.Tray $tag"
+
+          gh release create "$tag" `
+            "./AdoTimeTracker.Tray.zip" `
+            --title "$releaseName" `
+            --generate-notes
